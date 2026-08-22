@@ -3,12 +3,18 @@
 #include "efe/capture.hpp"
 
 #include <functional>
+#include <iosfwd>
 #include <string>
 
 namespace efe {
 
 enum class ReplayMode { MaxSpeed, Realtime, Scaled, Step };
-struct ReplayOptions { ReplayMode mode{ReplayMode::MaxSpeed}; double speed{1.0}; };
+struct ReplayOptions {
+    ReplayMode mode{ReplayMode::MaxSpeed};
+    double speed{1.0};
+    std::istream* step_input{nullptr};
+    std::ostream* step_output{nullptr};
+};
 
 class ReplayEngine {
 public:

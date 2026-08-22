@@ -9,6 +9,8 @@
 
 namespace efe {
 
+inline constexpr std::size_t kMaxCaptureDatagramSize = 65'535;
+
 struct CaptureRecord {
     std::uint64_t monotonic_ns{};
     std::vector<std::uint8_t> datagram;

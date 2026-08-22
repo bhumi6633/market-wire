@@ -24,6 +24,10 @@ void RecoveryEngine::drain(Result& r) {
         if (it == pending_.end()) break;
         r.ready.push_back(MoldMessage{it->first, std::move(it->second)});
         pending_.erase(it);
+        if (expected_ == std::numeric_limits<Sequence>::max()) {
+            pending_.erase(it);
+            throw DecodeError("MoldUDP64 sequence number exhausted");
+        }
         ++expected_;
     }
     if (last_requested_last_ < expected_) {
@@ -49,6 +53,7 @@ RecoveryEngine::Result RecoveryEngine::ingest(const MoldDownstreamPacket& packet
         }
         if (message.sequence == expected_) {
             r.ready.push_back(message);
+            if (expected_ == std::numeric_limits<Sequence>::max()) throw DecodeError("MoldUDP64 sequence number exhausted");
             ++expected_;
             drain(r);
         } else {

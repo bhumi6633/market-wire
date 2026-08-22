@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        build_type: [Debug, Release]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: cmake -S . -B build-${{ matrix.build_type }} -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -DCMAKE_CXX_FLAGS=-Werror
+      - name: Build
+        run: cmake --build build-${{ matrix.build_type }} --parallel 2
+      - name: Test
+        run: ctest --test-dir build-${{ matrix.build_type }} --output-on-failure
+
+  sanitizers:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure ASan and UBSan
+        run: cmake -S . -B build-sanitizers -DCMAKE_BUILD_TYPE=Debug -DEFE_ENABLE_SANITIZERS=ON -DEFE_BUILD_BENCHMARKS=OFF
+      - name: Build
+        run: cmake --build build-sanitizers --parallel 2
+      - name: Test
+        env:
+          ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
+          UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+        run: ctest --test-dir build-sanitizers --output-on-failure
+
+  fuzz-targets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure Clang/libFuzzer
+        env:
+          CXX: clang++
+        run: cmake -S . -B build-fuzz -DCMAKE_BUILD_TYPE=Debug -DEFE_ENABLE_FUZZING=ON -DEFE_BUILD_BENCHMARKS=OFF
+      - name: Compile fuzz targets
+        run: cmake --build build-fuzz --parallel 2
+      - name: Bounded fuzz smoke tests
+        run: |
+          ./build-fuzz/fuzz_itch fuzz/corpus/itch -max_total_time=5
+          ./build-fuzz/fuzz_moldudp fuzz/corpus/moldudp -max_total_time=5

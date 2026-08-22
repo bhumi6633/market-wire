@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cstring>
+#include <limits>
 
 namespace efe {
 
@@ -39,6 +40,9 @@ MoldDownstreamPacket MoldUdp64::parse_downstream(std::span<const std::uint8_t> d
     }
 
     out.messages.reserve(out.message_count);
+    if (out.first_sequence > std::numeric_limits<Sequence>::max() - static_cast<Sequence>(out.message_count - 1U)) {
+        throw DecodeError("MoldUDP64 sequence range overflows");
+    }
     std::size_t offset = 20;
     for (std::uint16_t i = 0; i < out.message_count; ++i) {
         require_bytes(d, offset, 2);

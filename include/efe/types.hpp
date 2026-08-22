@@ -12,7 +12,9 @@ namespace efe {
 using OrderId = std::uint64_t;
 using Quantity = std::uint32_t;
 using Price = std::uint32_t;      // Nasdaq ITCH Price(4): implied four decimal places.
-using Sequence = std::uint64_t;
+using Timestamp = std::uint64_t;  // Nanoseconds since midnight for ITCH event metadata.
+using SequenceNumber = std::uint64_t;
+using Sequence = SequenceNumber;
 using SlotIndex = std::uint32_t;
 
 constexpr SlotIndex kInvalidSlot = 0xFFFF'FFFFu;
@@ -62,8 +64,8 @@ struct SymbolHash {
     std::size_t operator()(const Symbol& symbol) const noexcept {
         // FNV-1a over the fixed-width eight-byte symbol.
         std::uint64_t h = 1469598103934665603ULL;
-        for (unsigned char c : symbol.bytes) {
-            h ^= c;
+        for (char c : symbol.bytes) {
+            h ^= static_cast<unsigned char>(c);
             h *= 1099511628211ULL;
         }
         return static_cast<std::size_t>(h);
@@ -86,7 +88,7 @@ inline const char* to_string(Side side) noexcept {
 struct EventMeta {
     std::uint16_t stock_locate{};
     std::uint16_t tracking_number{};
-    std::uint64_t timestamp_ns{};
+    Timestamp timestamp_ns{};
 };
 
 struct Order {

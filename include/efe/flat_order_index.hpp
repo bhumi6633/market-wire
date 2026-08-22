@@ -48,6 +48,11 @@ public:
             }
             pos = (pos + 1) & mask_;
         }
+        if (tombstone) {
+            entries_[*tombstone] = Entry{key, value, State::Occupied};
+            ++size_;
+            return true;
+        }
         return false;
     }
 

@@ -16,6 +16,7 @@
 #include <iostream>
 #include <optional>
 #include <span>
+#include <stdexcept>
 #include <string>
 #include <thread>
 #include <vector>
@@ -74,9 +75,8 @@ int demo() {
     return 0;
 }
 
-int replay(const std::string& path, double speed) {
+int replay(const std::string& path, const efe::ReplayOptions& options) {
     efe::RecoveryEngine recovery(1); efe::ItchDecoder decoder; efe::OrderBook book(1'000'000);
-    efe::ReplayOptions options; options.mode = speed==0 ? efe::ReplayMode::MaxSpeed : efe::ReplayMode::Scaled; options.speed=speed==0?1.0:speed;
     const auto start=std::chrono::steady_clock::now(); std::size_t messages=0;
     const auto packets=efe::ReplayEngine::run(path,options,[&](const efe::CaptureRecord& rec){
         const auto packet=efe::MoldUdp64::parse_downstream(rec.datagram); const auto result=recovery.ingest(packet);
@@ -86,6 +86,34 @@ int replay(const std::string& path, double speed) {
     std::cout << "replayed " << packets << " packets / " << messages << " messages in " << elapsed << " s\n";
     std::cout << "live orders=" << book.live_order_count() << " state_hash=0x" << std::hex << book.state_hash() << std::dec << '\n';
     return 0;
+}
+
+efe::ReplayOptions replay_options(int argc,char**argv){
+    efe::ReplayOptions options;
+    if(argc<4)return options;
+    const std::string_view argument=argv[3];
+    if(argument=="--step"||argument=="step")options.mode=efe::ReplayMode::Step;
+    else if(argument=="--realtime"||argument=="realtime")options.mode=efe::ReplayMode::Realtime;
+    else{
+        std::string_view value=argument;
+        if(argument=="--speed"){
+            if(argc<5)throw std::invalid_argument("--speed requires max or a positive multiplier");
+            value=argv[4];
+        }
+        if(value=="max"||value=="0")return options;
+        options.speed=std::stod(std::string(value));
+        if(options.speed<=0.0)throw std::invalid_argument("replay speed must be positive");
+        options.mode=efe::ReplayMode::Scaled;
+    }
+    return options;
+}
+
+void help(){
+    std::cout<<"Exchange Feed Engine\n"
+             <<"  feed_engine demo\n"
+             <<"  feed_engine make-sample-capture <file>\n"
+             <<"  feed_engine replay <capture> [--speed max|N | --realtime | --step]\n"
+             <<"  feed_engine listen <group> <port> <rerequest-host> <rerequest-port> [capture.efc]\n";
 }
 
 int make_sample_capture(const std::string& path) {
@@ -107,7 +135,9 @@ int listen(int argc, char** argv) {
     std::optional<efe::CaptureWriter> capture; if(argc>=7) capture.emplace(argv[6]);
     const auto epoch=std::chrono::steady_clock::now();
     while(true){
-        const auto d=socket.receive(); const auto now=std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now()-epoch).count(); if(capture) capture->write(static_cast<std::uint64_t>(now),d);
+        const auto d=socket.receive();
+        if (d.empty() && socket.stop_requested()) break;
+        const auto now=std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now()-epoch).count(); if(capture) capture->write(static_cast<std::uint64_t>(now),d);
         const auto packet=efe::MoldUdp64::parse_downstream(d); const auto r=recovery.ingest(packet);
         if(r.request && recovery.session()) { const auto req=efe::MoldUdp64::encode_request({*recovery.session(),r.request->first,r.request->count}); socket.send_unicast(host,rport,req); }
         for(const auto& m:r.ready) if(auto e=decoder.decode_book_event(m.payload)) if(!book.apply(*e)) std::cerr << "book rejected seq " << m.sequence << '\n';
@@ -121,9 +151,10 @@ int listen(int argc, char** argv) {
 int main(int argc, char** argv) {
     try {
         if(argc==1 || std::string_view(argv[1])=="demo") return demo();
-        if(std::string_view(argv[1])=="replay") { if(argc<3){std::cerr<<"usage: feed_engine replay <capture.efc> [speed; 0=max]\n";return 2;} return replay(argv[2],argc>=4?std::stod(argv[3]):0.0); }
+        if(std::string_view(argv[1])=="--help"||std::string_view(argv[1])=="help"){help();return 0;}
+        if(std::string_view(argv[1])=="replay") { if(argc<3){std::cerr<<"usage: feed_engine replay <capture.efc> [--speed max|N | --realtime | --step]\n";return 2;} return replay(argv[2],replay_options(argc,argv)); }
         if(std::string_view(argv[1])=="make-sample-capture") { if(argc<3){std::cerr<<"usage: feed_engine make-sample-capture <capture.efc>\n";return 2;} return make_sample_capture(argv[2]); }
         if(std::string_view(argv[1])=="listen") return listen(argc,argv);
-        std::cerr << "commands: demo | make-sample-capture | replay | listen\n"; return 2;
+        std::cerr << "unknown command; run feed_engine --help\n"; return 2;
     } catch(const std::exception& e) { std::cerr << "fatal: " << e.what() << '\n'; return 1; }
 }

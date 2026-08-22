@@ -79,16 +79,32 @@ bool OrderBook::add(const AddEvent& event) {
         return false;
     }
 
-    auto& symbol_book = books_[order.symbol];
-    auto& level = order.side == Side::Buy ? symbol_book.bids[order.price] : symbol_book.asks[order.price];
-    if (std::numeric_limits<Quantity>::max() - level.total_quantity < order.quantity) {
+    try {
+        auto& symbol_book = books_[order.symbol];
+        const auto add_to = [&](auto& levels) {
+            auto [level_it, inserted] = levels.try_emplace(order.price);
+            auto& level = level_it->second;
+            if (std::numeric_limits<Quantity>::max() - level.total_quantity < order.quantity) {
+                if (inserted) levels.erase(level_it);
+                return false;
+            }
+            level.total_quantity += order.quantity;
+            link_at_tail(level, slot);
+            return true;
+        };
+        const bool added = order.side == Side::Buy ? add_to(symbol_book.bids) : add_to(symbol_book.asks);
+        if (added) return true;
+        if (symbol_book.bids.empty() && symbol_book.asks.empty()) books_.erase(order.symbol);
         index_.erase(order.id);
         release_slot(slot);
         return false;
+    } catch (...) {
+        index_.erase(order.id);
+        release_slot(slot);
+        auto book_it = books_.find(order.symbol);
+        if (book_it != books_.end() && book_it->second.bids.empty() && book_it->second.asks.empty()) books_.erase(book_it);
+        throw;
     }
-    level.total_quantity += order.quantity;
-    link_at_tail(level, slot);
-    return true;
 }
 
 bool OrderBook::execute(const ExecuteEvent& event) {
@@ -124,9 +140,47 @@ bool OrderBook::erase(const DeleteEvent& event) { return remove_order(event.orde
 bool OrderBook::replace(const ReplaceEvent& event) {
     const auto old_slot = index_.find(event.old_order_id);
     if (!old_slot || event.new_order_id == 0 || event.new_quantity == 0 || index_.find(event.new_order_id)) return false;
-    const Order old = slots_[*old_slot].order;
-    if (!remove_order(event.old_order_id)) return false;
-    return add(AddEvent{event.meta, Order{event.new_order_id, old.symbol, old.side, event.new_quantity, event.new_price}});
+    Slot& slot = slots_[*old_slot];
+    const Order old = slot.order;
+    auto& symbol_book = books_.at(old.symbol);
+    const auto replace_in = [&](auto& levels) {
+        auto old_level_it = levels.find(old.price);
+        if (old.price == event.new_price) {
+            auto& level = old_level_it->second;
+            const auto without_old = static_cast<std::uint64_t>(level.total_quantity) - old.quantity;
+            if (without_old + event.new_quantity > std::numeric_limits<Quantity>::max()) return false;
+            if (!index_.insert(event.new_order_id, *old_slot)) return false;
+            unlink(level, *old_slot);
+            level.total_quantity = static_cast<Quantity>(without_old + event.new_quantity);
+            slot.order.id = event.new_order_id;
+            slot.order.quantity = event.new_quantity;
+            link_at_tail(level, *old_slot);
+            index_.erase(event.old_order_id);
+            return true;
+        }
+        auto [new_level_it, inserted] = levels.try_emplace(event.new_price);
+        auto& new_level = new_level_it->second;
+        if (std::numeric_limits<Quantity>::max() - new_level.total_quantity < event.new_quantity) {
+            if (inserted) levels.erase(new_level_it);
+            return false;
+        }
+        if (!index_.insert(event.new_order_id, *old_slot)) {
+            if (inserted) levels.erase(new_level_it);
+            return false;
+        }
+        auto& old_level = old_level_it->second;
+        unlink(old_level, *old_slot);
+        old_level.total_quantity -= old.quantity;
+        slot.order.id = event.new_order_id;
+        slot.order.quantity = event.new_quantity;
+        slot.order.price = event.new_price;
+        new_level.total_quantity += event.new_quantity;
+        link_at_tail(new_level, *old_slot);
+        index_.erase(event.old_order_id);
+        if (old_level.head == kInvalidSlot) levels.erase(old_level_it);
+        return true;
+    };
+    return old.side == Side::Buy ? replace_in(symbol_book.bids) : replace_in(symbol_book.asks);
 }
 
 bool OrderBook::remove_order(OrderId id) {
@@ -202,17 +256,26 @@ std::vector<OrderBook::LevelSnapshot> OrderBook::ask_levels(const Symbol& symbol
 }
 
 std::uint64_t OrderBook::state_hash() const {
-    std::vector<const Order*> orders;
-    orders.reserve(index_.size());
-    for (const auto& slot : slots_) if (slot.alive) orders.push_back(&slot.order);
-    std::sort(orders.begin(), orders.end(), [](const Order* a, const Order* b) { return a->id < b->id; });
     std::uint64_t h = 0xcbf29ce484222325ULL;
-    for (const Order* order : orders) {
-        hash_mix(h, order->id);
-        for (unsigned char c : order->symbol.bytes) hash_mix(h, c);
-        hash_mix(h, static_cast<std::uint8_t>(order->side));
-        hash_mix(h, order->quantity);
-        hash_mix(h, order->price);
+    hash_mix(h, books_.size());
+    const auto hash_levels = [this, &h](const auto& levels, Side side) {
+        hash_mix(h, static_cast<std::uint8_t>(side));
+        hash_mix(h, levels.size());
+        for (const auto& [price, level] : levels) {
+            hash_mix(h, price);
+            hash_mix(h, level.total_quantity);
+            for (auto slot = level.head; slot != kInvalidSlot; slot = slots_[slot].next) {
+                const Order& order = slots_[slot].order;
+                hash_mix(h, order.id);
+                hash_mix(h, order.quantity);
+            }
+            hash_mix(h, kInvalidSlot);
+        }
+    };
+    for (const auto& [symbol, book] : books_) {
+        for (char c : symbol.bytes) hash_mix(h, static_cast<unsigned char>(c));
+        hash_levels(book.bids, Side::Buy);
+        hash_levels(book.asks, Side::Sell);
     }
     return h;
 }

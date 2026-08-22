@@ -51,8 +51,8 @@ This repository is deliberately infrastructure, not a trading bot. It receives/d
   - POSIX UDP multicast receiver
   - UDP unicast re-request sender
 - **Performance lab**
-  - generated-vs-handwritten decoder throughput
-  - P50/P95/P99/P99.9 latency samples
+  - generated-vs-handwritten mixed-message decoder throughput
+  - warmup, alternating run order, repeated trials, and batched timing above clock resolution
 - **Hardening**
   - unit/integration tests
   - optional ASan + UBSan builds
@@ -123,7 +123,7 @@ The demo intentionally delivers sequence 3 before sequence 2. The recovery engin
 ./build/efe_bench 500000
 ```
 
-This compares the schema-generated book-message decoder with the deliberately straightforward handwritten reference decoder. Treat results as machine/build specific; do not copy benchmark numbers into a resume without measuring your own release build on controlled hardware.
+This compares the schema-generated book-message decoder with the deliberately straightforward handwritten reference decoder over the same mixed A/E/X/D/U workload. It warms both implementations, alternates run order across seven trials, and reports median throughput plus 256-message batch times. It deliberately does not report per-message nanosecond percentiles. Treat results as machine/build specific; do not copy benchmark numbers into a resume without measuring your own release build on controlled hardware.
 
 For hardware-counter work on Linux:
 
@@ -143,6 +143,10 @@ cmake --build build-asan -j
 ctest --test-dir build-asan --output-on-failure
 ```
 
+## Test strategy
+
+CTest registers separate order-book, ITCH, transport/recovery, end-to-end pipeline property, capture/replay, networking, protocol-compiler, and CLI tests. The order-book test runs 100,000 deterministic randomized transitions against a reference model and continuously checks lookup, quantities, best prices, aggregate levels, FIFO, capacity reuse, and live counts. A second fault-injection property test shuffles 50,000 real MoldUDP64/ITCH messages, injects duplicates, proves recovery releases only sequences 1…50,000 contiguously, and compares the recovered book hash with ordered processing. Decoder tests cover every schema layout and differential A/F/E/C/X/D/U behavior. Local UDP integration is reported as skipped only when the execution environment forbids socket binding; GitHub Actions runs it on a normal Linux runner.
+
 ## Fuzzing
 
 With Clang:
@@ -153,8 +157,8 @@ cmake -S . -B build-fuzz \
   -DEFE_ENABLE_FUZZING=ON \
   -DEFE_BUILD_BENCHMARKS=OFF
 cmake --build build-fuzz -j
-./build-fuzz/fuzz_moldudp -max_total_time=30
-./build-fuzz/fuzz_itch -max_total_time=30
+./build-fuzz/fuzz_moldudp fuzz/corpus/moldudp -max_total_time=30
+./build-fuzz/fuzz_itch fuzz/corpus/itch -max_total_time=30
 ```
 
 ## Live UDP mode
@@ -180,13 +184,17 @@ Then replay it:
 
 ```bash
 # 0 means maximum speed
-./build/feed_engine replay capture.efc 0
+./build/feed_engine replay capture.efc --speed max
 
 # 10x recorded timing
-./build/feed_engine replay capture.efc 10
+./build/feed_engine replay capture.efc --speed 10
+
+# recorded timing, or interactive packet stepping
+./build/feed_engine replay capture.efc --realtime
+./build/feed_engine replay capture.efc --step
 ```
 
-The final `state_hash` is intended as a compact deterministic-regression signal: identical ordered input should lead to identical displayed-book state.
+The final `state_hash` covers symbols, sides, price levels, aggregate quantities, individual quantities, and FIFO order. It is a compact deterministic-regression signal: identical ordered input should lead to identical displayed-book state.
 
 ## Protocol DSL
 
@@ -251,6 +259,8 @@ fuzz/                 libFuzzer entry points
 docs/                 architecture and learning notes
 .github/workflows/     CI
 ```
+
+Detailed notes live in [architecture](docs/ARCHITECTURE.md), [protocol compiler](docs/protocol-compiler.md), [recovery](docs/recovery.md), [capture format](docs/capture-format.md), and [benchmarking](docs/benchmarking.md).
 
 ## Primary protocol references
 

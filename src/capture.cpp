@@ -31,7 +31,7 @@ CaptureWriter::CaptureWriter(const std::string& path) : out_(path, std::ios::bin
     out_.write("EFC2",4);
 }
 void CaptureWriter::write(std::uint64_t ns, std::span<const std::uint8_t> d) {
-    if(d.size()>0xFFFF'FFFFULL) throw std::runtime_error("capture datagram too large");
+    if(d.size()>kMaxCaptureDatagramSize) throw std::runtime_error("capture datagram too large");
     write_u64(out_,ns); write_u32(out_,static_cast<std::uint32_t>(d.size()));
     out_.write(reinterpret_cast<const char*>(d.data()), static_cast<std::streamsize>(d.size()));
     if(!out_) throw std::runtime_error("capture write failed");
@@ -43,7 +43,9 @@ CaptureReader::CaptureReader(const std::string& path) : in_(path,std::ios::binar
 }
 std::optional<CaptureRecord> CaptureReader::next() {
     const int c=in_.peek(); if(c==std::char_traits<char>::eof()) return std::nullopt;
-    CaptureRecord r; r.monotonic_ns=read_u64(in_); const auto len=read_u32(in_); r.datagram.resize(len);
+    CaptureRecord r; r.monotonic_ns=read_u64(in_); const auto len=read_u32(in_);
+    if (len > kMaxCaptureDatagramSize) throw std::runtime_error("capture datagram length exceeds limit");
+    r.datagram.resize(len);
     in_.read(reinterpret_cast<char*>(r.datagram.data()), static_cast<std::streamsize>(len));
     if(!in_) throw std::runtime_error("truncated capture payload");
     return r;
