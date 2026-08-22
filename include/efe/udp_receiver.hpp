@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <cstdint>
 #include <span>
 #include <string>
@@ -27,4 +28,3 @@ private:
 };
 
 }  // namespace efe
-#include <atomic>

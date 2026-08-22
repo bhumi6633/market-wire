@@ -1,6 +1,7 @@
 #include "efe/order_book.hpp"
 #include "test_support.hpp"
 
+#include <algorithm>
 #include <limits>
 #include <map>
 #include <random>

@@ -76,7 +76,7 @@ git diff --check
 ## Build and test results
 
 - Debug: configured and built all targets successfully with AppleClang 16.0.0.
-- Strict warnings: the configured `-Wall -Wextra -Wpedantic -Wconversion -Wshadow -Wsign-conversion` set built cleanly with `-Werror`.
+- Strict warnings: the configured `-Wall -Wextra -Wpedantic -Wconversion -Wshadow -Wsign-conversion` set built cleanly with `-Werror` under AppleClang 16 and GCC 14.
 - Release: built `libefe_core.a`, `efe_protocolc`, `feed_engine`, `efe_bench`, and all test executables.
 - CTest: 8 registered tests; 7 passed, 0 failed, 1 environment skip. The skipped network test reported `bind: Operation not permitted` because this managed workspace forbids local socket binding. It is configured to execute normally on GitHub's Linux runner.
 - Randomized book validation: 100,000 mixed Add/Execute/Cancel/Delete/Replace transitions completed against the reference model with seed `0x0EFE5EED`; live counts, lookup, quantities, sides, prices, best bid/ask, aggregate levels, FIFO, capacity reuse, and symbol isolation were checked.

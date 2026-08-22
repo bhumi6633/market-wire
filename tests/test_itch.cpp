@@ -43,7 +43,7 @@ int main() {
         {'A',36},{'F',40},{'E',31},{'C',36},{'X',23},{'D',19},{'U',35},{'P',44},{'Q',40},{'B',19},{'I',50},{'N',20},{'O',48}
     }};
     efe::ItchDecoder generated;
-    for (const auto [type,size] : layouts) {
+    for (const auto& [type,size] : layouts) {
         CHECK(g::message_size(type) == size);
         auto bytes = test::base(type,size);
         generated.validate(bytes);
