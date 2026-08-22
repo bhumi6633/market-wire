@@ -79,7 +79,7 @@ void UdpMulticastReceiver::request_stop() noexcept {
     if (stop_requested_.exchange(true, std::memory_order_relaxed)) return;
     if (wake_write_fd_ >= 0) {
         const std::uint8_t byte = 1;
-        (void)::write(wake_write_fd_, &byte, sizeof(byte));
+        [[maybe_unused]] const auto bytes_written = ::write(wake_write_fd_, &byte, sizeof(byte));
     }
 }
 
