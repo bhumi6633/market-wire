@@ -1,0 +1,238 @@
+protocol NasdaqITCH50;
+
+message SystemEvent "S" {
+    stock_locate: u16_be;
+    tracking_number: u16_be;
+    timestamp: u48_be;
+    event_code: char;
+}
+
+message StockDirectory "R" {
+    stock_locate: u16_be;
+    tracking_number: u16_be;
+    timestamp: u48_be;
+    stock: ascii[8];
+    market_category: char;
+    financial_status_indicator: char;
+    round_lot_size: u32_be;
+    round_lots_only: char;
+    issue_classification: char;
+    issue_sub_type: ascii[2];
+    authenticity: char;
+    short_sale_threshold_indicator: char;
+    ipo_flag: char;
+    luld_reference_price_tier: char;
+    etp_flag: char;
+    etp_leverage_factor: u32_be;
+    inverse_indicator: char;
+}
+
+message StockTradingAction "H" {
+    stock_locate: u16_be;
+    tracking_number: u16_be;
+    timestamp: u48_be;
+    stock: ascii[8];
+    trading_state: char;
+    reserved: char;
+    reason: ascii[4];
+}
+
+message RegShoRestriction "Y" {
+    stock_locate: u16_be;
+    tracking_number: u16_be;
+    timestamp: u48_be;
+    stock: ascii[8];
+    reg_sho_action: char;
+}
+
+message MarketParticipantPosition "L" {
+    stock_locate: u16_be;
+    tracking_number: u16_be;
+    timestamp: u48_be;
+    mpid: ascii[4];
+    stock: ascii[8];
+    primary_market_maker: char;
+    market_maker_mode: char;
+    market_participant_state: char;
+}
+
+message MwcbDeclineLevel "V" {
+    stock_locate: u16_be;
+    tracking_number: u16_be;
+    timestamp: u48_be;
+    level1: price8;
+    level2: price8;
+    level3: price8;
+}
+
+message MwcbStatus "W" {
+    stock_locate: u16_be;
+    tracking_number: u16_be;
+    timestamp: u48_be;
+    breached_level: char;
+}
+
+message IpoQuotingPeriodUpdate "K" {
+    stock_locate: u16_be;
+    tracking_number: u16_be;
+    timestamp: u48_be;
+    stock: ascii[8];
+    ipo_quotation_release_time: u32_be;
+    ipo_quotation_release_qualifier: char;
+    ipo_price: price4;
+}
+
+message LuldAuctionCollar "J" {
+    stock_locate: u16_be;
+    tracking_number: u16_be;
+    timestamp: u48_be;
+    stock: ascii[8];
+    auction_collar_reference_price: price4;
+    upper_auction_collar_price: price4;
+    lower_auction_collar_price: price4;
+    auction_collar_extension: u32_be;
+}
+
+message OperationalHalt "h" {
+    stock_locate: u16_be;
+    tracking_number: u16_be;
+    timestamp: u48_be;
+    stock: ascii[8];
+    market_code: char;
+    operational_halt_action: char;
+}
+
+message AddOrder "A" {
+    stock_locate: u16_be;
+    tracking_number: u16_be;
+    timestamp: u48_be;
+    order_reference: u64_be;
+    side: char;
+    shares: u32_be;
+    stock: ascii[8];
+    price: price4;
+}
+
+message AddOrderWithMpid "F" {
+    stock_locate: u16_be;
+    tracking_number: u16_be;
+    timestamp: u48_be;
+    order_reference: u64_be;
+    side: char;
+    shares: u32_be;
+    stock: ascii[8];
+    price: price4;
+    attribution: ascii[4];
+}
+
+message OrderExecuted "E" {
+    stock_locate: u16_be;
+    tracking_number: u16_be;
+    timestamp: u48_be;
+    order_reference: u64_be;
+    executed_shares: u32_be;
+    match_number: u64_be;
+}
+
+message OrderExecutedWithPrice "C" {
+    stock_locate: u16_be;
+    tracking_number: u16_be;
+    timestamp: u48_be;
+    order_reference: u64_be;
+    executed_shares: u32_be;
+    match_number: u64_be;
+    printable: char;
+    execution_price: price4;
+}
+
+message OrderCancel "X" {
+    stock_locate: u16_be;
+    tracking_number: u16_be;
+    timestamp: u48_be;
+    order_reference: u64_be;
+    canceled_shares: u32_be;
+}
+
+message OrderDelete "D" {
+    stock_locate: u16_be;
+    tracking_number: u16_be;
+    timestamp: u48_be;
+    order_reference: u64_be;
+}
+
+message OrderReplace "U" {
+    stock_locate: u16_be;
+    tracking_number: u16_be;
+    timestamp: u48_be;
+    original_order_reference: u64_be;
+    new_order_reference: u64_be;
+    shares: u32_be;
+    price: price4;
+}
+
+message Trade "P" {
+    stock_locate: u16_be;
+    tracking_number: u16_be;
+    timestamp: u48_be;
+    order_reference: u64_be;
+    side: char;
+    shares: u32_be;
+    stock: ascii[8];
+    price: price4;
+    match_number: u64_be;
+}
+
+message CrossTrade "Q" {
+    stock_locate: u16_be;
+    tracking_number: u16_be;
+    timestamp: u48_be;
+    shares: u64_be;
+    stock: ascii[8];
+    cross_price: price4;
+    match_number: u64_be;
+    cross_type: char;
+}
+
+message BrokenTrade "B" {
+    stock_locate: u16_be;
+    tracking_number: u16_be;
+    timestamp: u48_be;
+    match_number: u64_be;
+}
+
+message Noii "I" {
+    stock_locate: u16_be;
+    tracking_number: u16_be;
+    timestamp: u48_be;
+    paired_shares: u64_be;
+    imbalance_shares: u64_be;
+    imbalance_direction: char;
+    stock: ascii[8];
+    far_price: price4;
+    near_price: price4;
+    current_reference_price: price4;
+    cross_type: char;
+    price_variation_indicator: char;
+}
+
+message RetailInterest "N" {
+    stock_locate: u16_be;
+    tracking_number: u16_be;
+    timestamp: u48_be;
+    stock: ascii[8];
+    interest_flag: char;
+}
+
+message DirectListingCapitalRaise "O" {
+    stock_locate: u16_be;
+    tracking_number: u16_be;
+    timestamp: u48_be;
+    stock: ascii[8];
+    open_eligibility_status: char;
+    minimum_allowable_price: price4;
+    maximum_allowable_price: price4;
+    near_execution_price: price4;
+    near_execution_time: u64_be;
+    lower_price_range_collar: price4;
+    upper_price_range_collar: price4;
+}
