@@ -1,9 +1,5 @@
 # MarketWire - Nasdaq Market Data Engine
 
-[![CI](https://github.com/bhumi6633/exchange-feed-engine/actions/workflows/ci.yml/badge.svg)](https://github.com/bhumi6633/exchange-feed-engine/actions/workflows/ci.yml)
-![C++20](https://img.shields.io/badge/C%2B%2B-20-00599C?logo=cplusplus)
-![CMake](https://img.shields.io/badge/CMake-3.20%2B-064F8C?logo=cmake)
-
 **A C++20 market-data engine for decoding Nasdaq ITCH 5.0, recovering MoldUDP64 sequence gaps, reconstructing a deterministic limit order book, and generating binary decoders from a custom protocol DSL.**
 
 > **The idea:** do the protocol-heavy work during the build, then keep runtime decoding small, predictable, and easy to measure.
